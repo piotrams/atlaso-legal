@@ -38,5 +38,8 @@ npx expo start --dev-client
 ```
 `npx expo start --web` previews the UI only (ads are stubbed).
 
+## App icon
+Original artwork (neon vault dial + D-pad), no game assets. Source: `assets/source/icon.svg`. Edit `scripts/make-icons.js` and run `node scripts/make-icons.js assets` to regenerate every size.
+
 ## Store review note
 Apple and Google often reject apps that use a game's trademark as the app name or show its logo or art. Keep the brand ("Cheat Vault"), mention the game only descriptively (e.g. subtitle "Codes for GTA 6"), use no Rockstar artwork, and keep the in-app disclaimer.
