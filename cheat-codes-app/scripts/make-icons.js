@@ -1,4 +1,6 @@
-// Regenerates all icon PNGs: node scripts/make-icons.js assets  (needs Playwright + Chromium)
+// Regenerates all icon PNGs: node scripts/make-icons.js assets
+// Plain version without the word: ICON_LABEL= node scripts/make-icons.js assets
+// Needs Playwright + Chromium; the label uses Inter Display Black if installed.
 const { chromium } = require('playwright');
 const fs = require('fs');
 const out = process.argv[2];
@@ -42,6 +44,9 @@ const defs = `
   <linearGradient id="pad" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#FFD0E4"/>
   </linearGradient>
+  <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#FF5FA2"/><stop offset="1" stop-color="#E0186E"/>
+  </linearGradient>
   <filter id="neon" x="-30%" y="-30%" width="160%" height="160%">
     <feGaussianBlur stdDeviation="14" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
   </filter>
@@ -63,22 +68,60 @@ function art(k, mono = false) {
     ${bolts}
     <g ${mono ? '' : 'opacity="0.9"'}>${ticks(292, 316, 36, W || '#22D3EE', 7)}</g>
     <circle cx="${C}" cy="${C}" r="262" fill="none" stroke="${W || '#FF3D8B'}" stroke-width="10" ${mono ? '' : 'filter="url(#neon)"'}/>
+    <g transform="translate(0 ${padDy}) translate(${C} ${C}) scale(${padK}) translate(${-C} ${-C})">
     <g ${mono ? '' : 'filter="url(#shadow)"'}>${dpad(130, 400, 30, W || 'url(#pad)')}</g>
     ${mono ? '' : arrows(130, 400, '#FF3D8B')}
     <circle cx="${C}" cy="${C}" r="30" fill="${mono ? '#000' : '#2D0D45'}" ${mono ? 'fill-opacity="0"' : ''}/>
+    </g>
   </g>`;
+}
+
+// "CHEATS" plate across the lower part of the dial. Uses Inter Display Black
+// (falls back to any heavy sans if it isn't installed).
+const LABEL = process.env.ICON_LABEL ?? 'CHEATS';
+function label(k, mono = false) {
+  if (!LABEL) return '';
+  const y = C + 205, w = 760, h = 200;
+  const text = (fill) => `<text x="${C}" y="${y + 6}" text-anchor="middle" dominant-baseline="middle"
+      font-family="'Inter Display', Inter, 'Arial Black', Impact, sans-serif" font-weight="900"
+      font-size="168" fill="${fill}" textLength="${w - 90}" lengthAdjust="spacingAndGlyphs">${LABEL}</text>`;
+  const plate = (fill, extra = '') =>
+    `<rect x="${C - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="44" fill="${fill}" ${extra}/>`;
+  const wrap = (inner) => `<g transform="translate(${C} ${C}) scale(${k}) translate(${-C} ${-C})">${inner}</g>`;
+  if (mono) {
+    // Android themed icons use alpha only, so the letters are cut out of the plate.
+    return wrap(`<mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+        <rect width="1024" height="1024" fill="#fff"/>${text('#000')}</mask>
+      ${plate('#fff', 'mask="url(#cut)"')}`);
+  }
+  return wrap(`<g filter="url(#shadow)">${plate('url(#plate)')}
+      <rect x="${C - w / 2 + 10}" y="${y - h / 2 + 10}" width="${w - 20}" height="${h - 20}" rx="36" fill="none" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="4"/></g>
+    ${text('#FFFFFF')}`);
+}
+// With a label, the D-pad moves up and shrinks to make room.
+const padK = LABEL ? 0.78 : 1, padDy = LABEL ? -70 : 0;
+
+// Monochrome: hide the dial under the plate so the cut-out letters read cleanly.
+function monoArt(k) {
+  if (!LABEL) return art(k, true);
+  const y = C + 205, w = 760, h = 200;
+  return `<mask id="hole" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <g transform="translate(${C} ${C}) scale(${k}) translate(${-C} ${-C})">
+        <rect x="${C - w / 2 - 16}" y="${y - h / 2 - 16}" width="${w + 32}" height="${h + 32}" rx="56" fill="#000"/></g></mask>
+    <g mask="url(#hole)">${art(k, true)}</g>`;
 }
 
 const svg = (body, bg = true) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">${defs}${bg ? '<rect width="1024" height="1024" fill="url(#bg)"/>' : ''}${body}</svg>`;
 
 const variants = {
-  'icon.png': { svg: svg(art(1)), size: 1024, opaque: true },
-  'splash-icon.png': { svg: svg(art(1), false), size: 1024 },
+  'icon.png': { svg: svg(art(1) + label(1)), size: 1024, opaque: true },
+  'splash-icon.png': { svg: svg(art(1) + label(1), false), size: 1024 },
   // Android adaptive: content must sit in the inner 66% safe zone
-  'android-icon-foreground.png': { svg: svg(art(0.62), false), size: 512 },
+  'android-icon-foreground.png': { svg: svg(art(0.62) + label(0.62), false), size: 512 },
   'android-icon-background.png': { svg: svg(''), size: 512, opaque: true },
-  'android-icon-monochrome.png': { svg: svg(art(0.62, true), false), size: 432 },
+  'android-icon-monochrome.png': { svg: svg(monoArt(0.62) + label(0.62, true), false), size: 432 },
   'favicon.png': { svg: svg(art(1.08)), size: 48, opaque: true },
 };
 
